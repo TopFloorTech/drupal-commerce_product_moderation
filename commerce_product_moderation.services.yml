@@ -1,0 +1,7 @@
+services:
+  commerce_product_moderation.state_transition_validation:
+    class: \Drupal\commerce_product_moderation\StateTransitionValidation
+    arguments: ['@commerce_product_moderation.moderation_information']
+  commerce_product_moderation.moderation_information:
+    class: Drupal\commerce_product_moderation\ModerationInformation
+    arguments: ['@entity_type.manager', '@entity_type.bundle.info']

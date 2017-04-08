@@ -1,0 +1,15 @@
+view any unpublished commerce product:
+  title: 'View any unpublished product'
+  description: 'This permission is necessary for any users that may moderate products.'
+
+'view commerce product moderation':
+  title: 'View commerce product moderation'
+  description: 'View commerce product moderation.'
+
+'administer commerce product moderation':
+  title: 'Administer commerce product moderation'
+  description: 'Administer workflows on commerce product entities.'
+  'restrict access': TRUE
+
+permission_callbacks:
+  - \Drupal\commerce_product_moderation\Permissions::transitionPermissions

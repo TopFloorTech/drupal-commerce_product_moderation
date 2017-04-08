@@ -1,0 +1,3 @@
+commerce_product_moderation.workflows:
+  deriver: 'Drupal\commerce_product_moderation\Plugin\Derivative\DynamicLocalTasks'
+  weight: 100

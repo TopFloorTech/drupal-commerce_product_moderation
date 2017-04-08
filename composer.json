@@ -1,0 +1,14 @@
+{
+  "name": "drupal/commerce_product_moderation",
+  "type": "drupal-module",
+  "description": "Supports moderation on product types",
+  "keywords": ["Drupal"],
+  "license": "GPL-2.0+",
+  "homepage": "https://www.drupal.org/project/commerce_product_moderation",
+  "minimum-stability": "dev",
+  "support": {
+    "issues": "https://www.drupal.org/project/issues/commerce_product_moderation",
+    "source": "http://cgit.drupalcode.org/commerce_product_moderation"
+  },
+  "require": { }
+}

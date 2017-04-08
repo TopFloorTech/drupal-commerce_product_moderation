@@ -1,0 +1,8 @@
+name: Commerce Product Moderation
+type: module
+description: Supports moderation on product types
+core: 8.x
+package: Commerce
+dependencies:
+  - commerce_product
+  - content_moderation
