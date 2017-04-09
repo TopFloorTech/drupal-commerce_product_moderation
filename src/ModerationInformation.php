@@ -81,14 +81,14 @@ class ModerationInformation implements ModerationInformationInterface {
    * {@inheritdoc}
    */
   public function getLatestRevisionId($entity_type_id, $entity_id) {
-    return NULL;
+    return $entity_id;
   }
 
   /**
    * {@inheritdoc}
    */
   public function getDefaultRevisionId($entity_type_id, $entity_id) {
-    return NULL;
+    return $entity_id;
   }
 
   /**

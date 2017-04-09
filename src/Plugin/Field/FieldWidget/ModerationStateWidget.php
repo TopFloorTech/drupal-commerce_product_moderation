@@ -145,6 +145,7 @@ class ModerationStateWidget extends OptionsSelectWidget implements ContainerFact
 
     // Use the dropbutton.
     $element['#process'][] = [get_called_class(), 'processActions'];
+
     return $element;
   }
 

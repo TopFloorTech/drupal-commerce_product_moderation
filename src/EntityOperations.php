@@ -52,10 +52,6 @@ class EntityOperations Extends \Drupal\content_moderation\EntityOperations {
     if (!$this->moderationInfo->isLatestRevision($entity)) {
       return;
     }
-    /** @var \Drupal\Core\Entity\ContentEntityInterface $entity */
-    if ($entity->isDefaultRevision()) {
-      return;
-    }
 
     $component = $display->getComponent('content_moderation_control');
     if ($component) {
@@ -113,15 +109,8 @@ class EntityOperations Extends \Drupal\content_moderation\EntityOperations {
       /** @var \Drupal\content_moderation\ContentModerationState $current_state */
       $current_state = $workflow->getState($entity->moderation_state->value);
 
-      // This entity is default if it is new, the default revision, or the
-      // default revision is not published.
-      $update_default_revision = $entity->isNew()
-        || $current_state->isDefaultRevisionState()
-        || !$this->isDefaultRevisionPublished($entity, $workflow);
-
       // Fire per-entity-type logic for handling the save process.
-      $this->entityTypeManager->getHandler($entity->getEntityTypeId(), 'product_moderation')->onPresave($entity, $update_default_revision, $current_state->isPublishedState());
+      $this->entityTypeManager->getHandler($entity->getEntityTypeId(), 'product_moderation')->onPresave($entity, TRUE, $current_state->isPublishedState());
     }
   }
-
 }
