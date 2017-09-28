@@ -3,6 +3,7 @@
 namespace Drupal\commerce_product_moderation\Plugin\WorkflowType;
 
 use Drupal\Core\Access\AccessResult;
+use Drupal\Core\Entity\EntityPublishedInterface;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\Core\Form\FormStateInterface;
 use Drupal\Core\Plugin\ContainerFactoryPluginInterface;
@@ -277,4 +278,13 @@ class ProductModeration extends WorkflowTypeBase implements ContainerFactoryPlug
     return $configuration;
   }
 
+  /**
+   * {@inheritdoc}
+   */
+  public function getInitialState(WorkflowInterface $workflow, $entity = NULL) {
+    if ($entity instanceof EntityPublishedInterface) {
+      return $workflow->getState($entity->isPublished() && !$entity->isNew() ? 'published' : 'draft');
+    }
+    return parent::getInitialState($workflow);
+  }
 }

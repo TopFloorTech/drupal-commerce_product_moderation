@@ -2,6 +2,7 @@
 
 namespace Drupal\commerce_product_moderation\Plugin\Field;
 
+use Drupal\commerce_product_moderation\Plugin\WorkflowType\ProductModeration;
 use Drupal\Core\Entity\ContentEntityInterface;
 use Drupal\Core\Field\FieldItemList;
 
@@ -37,8 +38,15 @@ class ModerationStateFieldItemList extends FieldItemList {
     // It is possible that the bundle does not exist at this point. For example,
     // the node type form creates a fake Node entity to get default values.
     // @see \Drupal\node\NodeTypeForm::form()
+    $moderation_state_id = NULL;
     $workflow = $moderation_info->getWorkflowForEntity($entity);
-    return $workflow ? $workflow->getInitialState()->id() : NULL;
+    if ($workflow) {
+      /** @var ProductModeration $workflowType */
+      $workflowType = $workflow->getTypePlugin();
+      $moderation_state_id = $workflowType->getInitialState($workflow, $entity)->id();
+    }
+
+    return $moderation_state_id;
   }
 
   /**
