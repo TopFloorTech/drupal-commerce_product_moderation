@@ -22,11 +22,11 @@ class Permissions {
     $permissions = [];
     /** @var \Drupal\workflows\WorkflowInterface $workflow */
     foreach (Workflow::loadMultipleByType('commerce_product_moderation') as $id => $workflow) {
-      foreach ($workflow->getTransitions() as $transition) {
+      foreach ($workflow->getTypePlugin()->getTransitions() as $transition) {
         $permissions['use ' . $workflow->id() . ' transition ' . $transition->id()] = [
-          'title' => $this->t('Use %transition transition from %workflow workflow.', [
-            '%transition' => $transition->label(),
+          'title' => $this->t('%workflow workflow: Use %transition transition.', [
             '%workflow' => $workflow->label(),
+            '%transition' => $transition->label(),
           ]),
         ];
       }
