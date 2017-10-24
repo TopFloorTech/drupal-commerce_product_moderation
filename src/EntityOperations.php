@@ -22,7 +22,6 @@ class EntityOperations Extends \Drupal\content_moderation\EntityOperations {
       $container->get('commerce_product_moderation.moderation_information'),
       $container->get('entity_type.manager'),
       $container->get('form_builder'),
-      $container->get('content_moderation.revision_tracker'),
       $container->get('entity_type.bundle.info')
     );
   }
