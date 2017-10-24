@@ -3,9 +3,9 @@
 namespace Drupal\commerce_product_moderation;
 
 use Drupal\commerce_product_moderation\Entity\Handler\ProductModerationHandler;
+use Drupal\commerce_product_moderation\Entity\Routing\ProductModerationRouteProvider;
 use Drupal\commerce_product_moderation\Form\ProductBundleModerationConfigurationForm;
 use Drupal\commerce_product_moderation\Plugin\Field\ModerationStateFieldItemList;
-use Drupal\commerce_product_moderation\Routing\ProductTypeModerationRouteProvider;
 use Drupal\Core\Config\Entity\ConfigEntityTypeInterface;
 use Drupal\Core\Entity\BundleEntityFormBase;
 use Drupal\Core\Entity\ContentEntityFormInterface;
@@ -45,44 +45,24 @@ class EntityTypeInfo extends \Drupal\content_moderation\EntityTypeInfo {
       $container->get('commerce_product_moderation.moderation_information'),
       $container->get('entity_type.manager'),
       $container->get('entity_type.bundle.info'),
-      $container->get('current_user')
+      $container->get('current_user'),
+      $container->get('commerce_product_moderation.state_transition_validation')
     );
   }
 
-
   /**
-   * Adds Moderation configuration to appropriate entity types.
-   *
-   * This is an alter hook bridge.
-   *
-   * @param EntityTypeInterface[] $entity_types
-   *   The master entity type list to alter.
-   *
-   * @see hook_entity_type_alter()
+   * {@inheritdoc}
    */
   public function entityTypeAlter(array &$entity_types) {
     if (isset($entity_types['commerce_product'])) {
       $entity_type = $entity_types['commerce_product'];
       // The ContentModerationState entity type should never be moderated.
       $entity_types['commerce_product'] = $this->addModerationToEntityType($entity_type);
-      // Add additional moderation support to entity types whose bundles are
-      // managed by a config entity type.
-      if ($entity_type->getBundleEntityType()) {
-        $entity_types[$entity_type->getBundleEntityType()] = $this->addModerationToBundleEntityType($entity_types[$entity_type->getBundleEntityType()]);
-      }
     }
   }
 
   /**
-   * Adds an operation on bundles that should have a Moderation form.
-   *
-   * @param \Drupal\Core\Entity\EntityInterface $entity
-   *   The entity on which to define an operation.
-   *
-   * @return array
-   *   An array of operation definitions.
-   *
-   * @see hook_entity_operation()
+   * {@inheritdoc}
    */
   public function entityOperation(EntityInterface $entity) {
     $operations = [];
@@ -102,30 +82,7 @@ class EntityTypeInfo extends \Drupal\content_moderation\EntityTypeInfo {
   }
 
   /**
-   * Gets the "extra fields" for a bundle.
-   *
-   * This is a hook bridge.
-   *
-   * @see hook_entity_extra_field_info()
-   *
-   * @return array
-   *   A nested array of 'pseudo-field' elements. Each list is nested within the
-   *   following keys: entity type, bundle name, context (either 'form' or
-   *   'display'). The keys are the name of the elements as appearing in the
-   *   renderable array (either the entity form or the displayed entity). The
-   *   value is an associative array:
-   *   - label: The human readable name of the element. Make sure you sanitize
-   *     this appropriately.
-   *   - description: A short description of the element contents.
-   *   - weight: The default weight of the element.
-   *   - visible: (optional) The default visibility of the element. Defaults to
-   *     TRUE.
-   *   - edit: (optional) String containing markup (normally a link) used as the
-   *     element's 'edit' operation in the administration interface. Only for
-   *     'form' context.
-   *   - delete: (optional) String containing markup (normally a link) used as
-   *     the element's 'delete' operation in the administration interface. Only
-   *     for 'form' context.
+   * {@inheritdoc}
    */
   public function entityExtraFieldInfo() {
     $return = [];
@@ -142,13 +99,7 @@ class EntityTypeInfo extends \Drupal\content_moderation\EntityTypeInfo {
   }
 
   /**
-   * Adds base field info to an entity type.
-   *
-   * @param \Drupal\Core\Entity\EntityTypeInterface $entity_type
-   *   Entity type for adding base fields to.
-   *
-   * @return \Drupal\Core\Field\BaseFieldDefinition[]
-   *   New fields added by moderation state.
+   * {@inheritdoc}
    */
   public function entityBaseFieldInfo(EntityTypeInterface $entity_type) {
     if (!$this->moderationInfo->canModerateEntitiesOfEntityType($entity_type)) {
@@ -182,15 +133,7 @@ class EntityTypeInfo extends \Drupal\content_moderation\EntityTypeInfo {
   }
 
   /**
-   * Redirect content entity edit forms on save, if there is a forward revision.
-   *
-   * When saving their changes, editors should see those changes displayed on
-   * the next page.
-   *
-   * @param array $form
-   *   An associative array containing the structure of the form.
-   * @param \Drupal\Core\Form\FormStateInterface $form_state
-   *   The current state of the form.
+   * {@inheritdoc}
    */
   public static function bundleFormRedirect(array &$form, FormStateInterface $form_state) {
     /* @var \Drupal\Core\Entity\ContentEntityInterface $entity */
@@ -204,16 +147,7 @@ class EntityTypeInfo extends \Drupal\content_moderation\EntityTypeInfo {
   }
 
   /**
-   * Alters bundle forms to enforce revision handling.
-   *
-   * @param array $form
-   *   An associative array containing the structure of the form.
-   * @param \Drupal\Core\Form\FormStateInterface $form_state
-   *   The current state of the form.
-   * @param string $form_id
-   *   The form id.
-   *
-   * @see hook_form_alter()
+   * {@inheritdoc}
    */
   public function formAlter(array &$form, FormStateInterface $form_state, $form_id) {
     $form_object = $form_state->getFormObject();
@@ -236,16 +170,7 @@ class EntityTypeInfo extends \Drupal\content_moderation\EntityTypeInfo {
   }
 
   /**
-   * Modifies an entity definition to include moderation support.
-   *
-   * This primarily just means an extra handler. A Generic one is provided,
-   * but individual entity types can provide their own as appropriate.
-   *
-   * @param \Drupal\Core\Entity\ContentEntityTypeInterface $type
-   *   The content entity definition to modify.
-   *
-   * @return \Drupal\Core\Entity\ContentEntityTypeInterface
-   *   The modified content entity definition.
+   * {@inheritdoc}
    */
   protected function addModerationToEntityType(ContentEntityTypeInterface $type) {
     if (!$type->hasHandlerClass('product_moderation')) {
@@ -253,36 +178,13 @@ class EntityTypeInfo extends \Drupal\content_moderation\EntityTypeInfo {
       $type->setHandlerClass('product_moderation', $handler_class);
     }
 
-    return $type;
-  }
-
-  /**
-   * Configures moderation configuration support on a entity type definition.
-   *
-   * That "configuration support" includes a configuration form, a hypermedia
-   * link, and a route provider to tie it all together. There's also a
-   * moderation handler for per-entity-type variation.
-   *
-   * @param \Drupal\Core\Config\Entity\ConfigEntityTypeInterface $type
-   *   The config entity definition to modify.
-   *
-   * @return \Drupal\Core\Config\Entity\ConfigEntityTypeInterface
-   *   The modified config entity definition.
-   */
-  protected function addModerationToBundleEntityType(ConfigEntityTypeInterface $type) {
-    if ($type->hasLinkTemplate('edit-form') && !$type->hasLinkTemplate('moderation-form')) {
-      $type->setLinkTemplate('moderation-form', $type->getLinkTemplate('edit-form') . '/moderation');
+    if (!$type->hasLinkTemplate('latest-version') && $type->hasLinkTemplate('canonical')) {
+      $type->setLinkTemplate('latest-version', $type->getLinkTemplate('canonical'));
     }
 
-    if (!$type->getFormClass('moderation')) {
-      $type->setFormClass('moderation', ProductBundleModerationConfigurationForm::class);
-    }
-
-    // @todo Core forgot to add a direct way to manipulate route_provider, so
-    // we have to do it the sloppy way for now.
     $providers = $type->getRouteProviderClasses() ?: [];
     if (empty($providers['moderation'])) {
-      $providers['moderation'] = ProductTypeModerationRouteProvider::class;
+      $providers['moderation'] = ProductModerationRouteProvider::class;
       $type->setHandlerClass('route_provider', $providers);
     }
 

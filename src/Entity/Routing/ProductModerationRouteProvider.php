@@ -1,15 +1,15 @@
 <?php
 
-namespace Drupal\commerce_product_moderation\Routing;
+namespace Drupal\commerce_product_moderation\Entity\Routing;
 
-use Drupal\content_moderation\Routing\EntityTypeModerationRouteProvider;
+use Drupal\content_moderation\Entity\Routing\EntityModerationRouteProvider;
 use Drupal\Core\Entity\EntityTypeInterface;
 use Symfony\Component\Routing\Route;
 
 /**
  * Provides the moderation configuration routes for config entities.
  */
-class ProductTypeModerationRouteProvider extends EntityTypeModerationRouteProvider {
+class ProductModerationRouteProvider extends EntityModerationRouteProvider {
 
   /**
    * Gets the moderation-form route.
