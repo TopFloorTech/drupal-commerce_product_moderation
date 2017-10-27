@@ -10,6 +10,7 @@ use Drupal\Core\StringTranslation\StringTranslationTrait;
 use Drupal\Core\StringTranslation\TranslationInterface;
 use Drupal\commerce_product_moderation\ModerationInformation;
 use Symfony\Component\DependencyInjection\ContainerInterface;
+use Symfony\Component\HttpFoundation\Request;
 
 /**
  * Defines a class for making the edit tab use 'Edit draft' or 'New draft'.
@@ -78,7 +79,7 @@ class EditTab extends LocalTaskDefault implements ContainerFactoryPluginInterfac
   /**
    * {@inheritdoc}
    */
-  public function getTitle() {
+  public function getTitle(Request $request = NULL) {
     // If the entity couldn't be loaded or moderation isn't enabled.
     if (!$this->entity || !$this->moderationInfo->isModeratedEntity($this->entity)) {
       return parent::getTitle();

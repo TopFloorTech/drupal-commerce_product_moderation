@@ -2,8 +2,8 @@
 
 namespace Drupal\commerce_product_moderation\Plugin\Field;
 
-use Drupal\commerce_product_moderation\Plugin\WorkflowType\ProductModeration;
 use Drupal\Core\Entity\ContentEntityInterface;
+use Drupal\Core\Entity\EntityPublishedInterface;
 use Drupal\Core\Field\FieldItemList;
 
 /**
@@ -19,6 +19,8 @@ class ModerationStateFieldItemList extends FieldItemList {
    *
    * @return string|null
    *   The moderation state ID linked to a content entity revision.
+   *
+   * @throws \Drupal\Component\Plugin\Exception\InvalidPluginDefinitionException
    */
   protected function getModerationStateId() {
     $entity = $this->getEntity();
@@ -35,18 +37,8 @@ class ModerationStateFieldItemList extends FieldItemList {
       return $content_moderation_state->moderation_state->value;
     }
 
-    // It is possible that the bundle does not exist at this point. For example,
-    // the node type form creates a fake Node entity to get default values.
-    // @see \Drupal\node\NodeTypeForm::form()
-    $moderation_state_id = NULL;
     $workflow = $moderation_info->getWorkflowForEntity($entity);
-    if ($workflow) {
-      /** @var ProductModeration $workflowType */
-      $workflowType = $workflow->getTypePlugin();
-      $moderation_state_id = $workflowType->getInitialState($workflow, $entity)->id();
-    }
-
-    return $moderation_state_id;
+    return $workflow ? $workflow->getTypePlugin()->getInitialState($entity)->id() : NULL;
   }
 
   /**
@@ -55,8 +47,10 @@ class ModerationStateFieldItemList extends FieldItemList {
    * @param \Drupal\Core\Entity\ContentEntityInterface $entity
    *   The entity the content moderation state entity will be loaded from.
    *
-   * @return \Drupal\content_moderation\ContentModerationStateInterface|null
+   * @return \Drupal\content_moderation\Entity\ContentModerationStateInterface|null
    *   The content_moderation_state revision or FALSE if none exists.
+   *
+   * @throws \Drupal\Component\Plugin\Exception\InvalidPluginDefinitionException
    */
   protected function loadContentModerationStateRevision(ContentEntityInterface $entity) {
     $moderation_info = \Drupal::service('commerce_product_moderation.moderation_information');
@@ -72,7 +66,7 @@ class ModerationStateFieldItemList extends FieldItemList {
       return NULL;
     }
 
-    /** @var \Drupal\content_moderation\ContentModerationStateInterface $content_moderation_state */
+    /** @var \Drupal\content_moderation\Entity\ContentModerationStateInterface $content_moderation_state */
     $content_moderation_state = $content_moderation_storage->loadRevision(key($revisions));
     if ($entity->getEntityType()->hasKey('langcode')) {
       $langcode = $entity->language()->getId();
@@ -107,6 +101,8 @@ class ModerationStateFieldItemList extends FieldItemList {
 
   /**
    * Recalculate the moderation field item list.
+   *
+   * @throws \Drupal\Component\Plugin\Exception\InvalidPluginDefinitionException
    */
   protected function computeModerationFieldItemList() {
     // Compute the value of the moderation state.
@@ -121,4 +117,59 @@ class ModerationStateFieldItemList extends FieldItemList {
     }
   }
 
+  /**
+   * {@inheritdoc}
+   */
+  public function onChange($delta) {
+    $this->updateModeratedEntity($this->list[$delta]->value);
+
+    parent::onChange($delta);
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function setValue($values, $notify = TRUE) {
+    parent::setValue($values, $notify);
+
+    if (isset($this->list[0])) {
+      $this->updateModeratedEntity($this->list[0]->value);
+    }
+  }
+
+  /**
+   * Updates the default revision flag and the publishing status of the entity.
+   *
+   * @param string $moderation_state_id
+   *   The ID of the new moderation state.
+   */
+  protected function updateModeratedEntity($moderation_state_id) {
+    $entity = $this->getEntity();
+
+    /** @var \Drupal\content_moderation\ModerationInformationInterface $content_moderation_info */
+    $content_moderation_info = \Drupal::service('commerce_product_moderation.moderation_information');
+    $workflow = $content_moderation_info->getWorkflowForEntity($entity);
+
+    // Change the entity's default revision flag and the publishing status only
+    // if the new workflow state is a valid one.
+    if ($workflow->getTypePlugin()->hasState($moderation_state_id)) {
+      /** @var \Drupal\content_moderation\ContentModerationState $current_state */
+      $current_state = $workflow->getTypePlugin()->getState($moderation_state_id);
+
+      // This entity is default if it is new, a new translation, the default
+      // revision state, or the default revision is not published.
+//      $update_default_revision = $entity->isNew()
+//        || $entity->isNewTranslation()
+//        || $current_state->isDefaultRevisionState()
+//        || !$content_moderation_info->isDefaultRevisionPublished($entity);
+//
+//      $entity->isDefaultRevision($update_default_revision);
+
+      // Update publishing status if it can be updated and if it needs updating.
+      $published_state = $current_state->isPublishedState();
+      if (($entity instanceof EntityPublishedInterface) && $entity->isPublished() !== $published_state) {
+        $published_state ? $entity->setPublished() : $entity->setUnpublished();
+      }
+    }
+  }
 }

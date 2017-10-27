@@ -4,9 +4,7 @@ namespace Drupal\commerce_product_moderation;
 
 use Drupal\commerce_product_moderation\Entity\Handler\ProductModerationHandler;
 use Drupal\commerce_product_moderation\Entity\Routing\ProductModerationRouteProvider;
-use Drupal\commerce_product_moderation\Form\ProductBundleModerationConfigurationForm;
 use Drupal\commerce_product_moderation\Plugin\Field\ModerationStateFieldItemList;
-use Drupal\Core\Config\Entity\ConfigEntityTypeInterface;
 use Drupal\Core\Entity\BundleEntityFormBase;
 use Drupal\Core\Entity\ContentEntityFormInterface;
 use Drupal\Core\Entity\ContentEntityTypeInterface;

@@ -114,7 +114,7 @@ class ModerationInformation implements ModerationInformationInterface {
     return $this->isLatestRevision($entity)
       && $entity->isDefaultRevision()
       && $entity->moderation_state->value
-      && $workflow->getState($entity->moderation_state->value)->isPublishedState();
+      && $workflow->getTypePlugin()->getState($entity->moderation_state->value)->isPublishedState();
   }
 
   /**

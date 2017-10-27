@@ -5,7 +5,7 @@ namespace Drupal\commerce_product_moderation\Entity\Handler;
 use Drupal\content_moderation\Entity\Handler\ModerationHandler;
 use Drupal\content_moderation\ModerationInformationInterface;
 use Drupal\Core\Entity\ContentEntityInterface;
-use Drupal\Core\Entity\EntityPublishedInterface;
+use Drupal\Core\Entity\EntityInterface;
 use Drupal\Core\Entity\EntityTypeInterface;
 use Drupal\Core\Form\FormStateInterface;
 use Symfony\Component\DependencyInjection\ContainerInterface;
@@ -65,14 +65,14 @@ class ProductModerationHandler extends ModerationHandler {
    * {@inheritdoc}
    */
   public function enforceRevisionsBundleFormAlter(array &$form, FormStateInterface $form_state, $form_id) {
-    /* @var \Drupal\node\Entity\NodeType $entity */
-    $entity = $form_state->getFormObject()->getEntity();
+    /* @var ContentEntityInterface $entity */
+    //$entity = $form_state->getFormObject()->getEntity();
 
-    if ($this->moderationInfo->getWorkflowForEntity($entity)) {
+    //if ($this->moderationInfo->getWorkflowForEntity($entity)) {
       // Force the revision checkbox on.
       //$form['workflow']['options']['#default_value']['revision'] = 'revision';
       //$form['workflow']['options']['revision']['#disabled'] = TRUE;
-    }
+    //}
   }
 
 }

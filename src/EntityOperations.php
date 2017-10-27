@@ -55,7 +55,6 @@ class EntityOperations Extends \Drupal\content_moderation\EntityOperations {
     $component = $display->getComponent('content_moderation_control');
     if ($component) {
       $build['commerce_product_moderation_control'] = $this->formBuilder->getForm(ProductModerationForm::class, $entity);
-      $build['commerce_product_moderation_control']['#weight'] = $component['weight'];
     }
   }
 
@@ -73,6 +72,8 @@ class EntityOperations Extends \Drupal\content_moderation\EntityOperations {
    *
    * @return bool
    *   TRUE if the default revision is published. FALSE otherwise.
+   *
+   * @throws \Drupal\Component\Plugin\Exception\InvalidPluginDefinitionException
    */
   protected function isDefaultRevisionPublished(EntityInterface $entity, WorkflowInterface $workflow) {
     $storage = $this->entityTypeManager->getStorage($entity->getEntityTypeId());
@@ -89,7 +90,7 @@ class EntityOperations Extends \Drupal\content_moderation\EntityOperations {
       $default_revision = $default_revision->getTranslation($entity->language()->getId());
     }
 
-    return $default_revision && $workflow->getState($entity->moderation_state->value)->isPublishedState();
+    return $default_revision && $workflow->getTypePlugin()->getState($entity->moderation_state->value)->isPublishedState();
   }
 
   /**
@@ -97,6 +98,8 @@ class EntityOperations Extends \Drupal\content_moderation\EntityOperations {
    *
    * @param \Drupal\Core\Entity\EntityInterface $entity
    *   The entity being saved.
+   *
+   * @throws \Drupal\Component\Plugin\Exception\InvalidPluginDefinitionException
    */
   public function entityPresave(EntityInterface $entity) {
     if (!$this->moderationInfo->isModeratedEntity($entity)) {
@@ -106,10 +109,11 @@ class EntityOperations Extends \Drupal\content_moderation\EntityOperations {
     if ($entity->moderation_state->value) {
       $workflow = $this->moderationInfo->getWorkflowForEntity($entity);
       /** @var \Drupal\content_moderation\ContentModerationState $current_state */
-      $current_state = $workflow->getState($entity->moderation_state->value);
+      $current_state = $workflow->getTypePlugin()->getState($entity->moderation_state->value);
 
       // Fire per-entity-type logic for handling the save process.
       $this->entityTypeManager->getHandler($entity->getEntityTypeId(), 'product_moderation')->onPresave($entity, TRUE, $current_state->isPublishedState());
     }
   }
+
 }

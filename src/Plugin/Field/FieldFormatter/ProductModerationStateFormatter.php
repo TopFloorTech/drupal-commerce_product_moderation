@@ -3,6 +3,7 @@
 namespace Drupal\commerce_product_moderation\Plugin\Field\FieldFormatter;
 
 use Drupal\content_moderation\ModerationInformationInterface;
+use Drupal\Core\Entity\ContentEntityInterface;
 use Drupal\Core\Field\FieldDefinitionInterface;
 use Drupal\Core\Field\FormatterBase;
 use Drupal\Core\Field\FieldItemListInterface;
@@ -58,10 +59,12 @@ class ProductModerationStateFormatter extends FormatterBase implements Container
    */
   public function viewElements(FieldItemListInterface $items, $langcode) {
     $elements = [];
-    $workflow = $this->moderationInformation->getWorkflowForEntity($items->getEntity());
+    /** @var ContentEntityInterface $entity */
+    $entity = $items->getEntity();
+    $workflow = $this->moderationInformation->getWorkflowForEntity($entity);
     foreach ($items as $delta => $item) {
       $elements[$delta] = [
-        '#markup' => $workflow->getState($item->value)->label(),
+        '#markup' => $workflow->getTypePlugin()->getState($item->value)->label(),
       ];
     }
     return $elements;
