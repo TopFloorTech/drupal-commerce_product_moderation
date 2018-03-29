@@ -22,5 +22,4 @@ class ProductModerationConfigureForm extends ContentModerationConfigureForm {
       $container->get('entity_type.bundle.info')
     );
   }
-
 }
