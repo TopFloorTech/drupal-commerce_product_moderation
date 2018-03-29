@@ -2,6 +2,10 @@ view any unpublished commerce product:
   title: 'View any unpublished product'
   description: 'This permission is necessary for any users that may moderate products.'
 
+'view latest product version':
+  title: 'View the latest product version'
+  description: 'Requires "View any unpublished product" or "View own unpublished product" permission.'
+
 'view commerce product moderation':
   title: 'View commerce product moderation'
   description: 'View commerce product moderation.'

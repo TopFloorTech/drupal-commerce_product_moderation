@@ -16,7 +16,8 @@ class ProductModerationForm extends EntityModerationForm {
   public static function create(ContainerInterface $container) {
     return new static(
       $container->get('commerce_product_moderation.moderation_information'),
-      $container->get('commerce_product_moderation.state_transition_validation')
+      $container->get('commerce_product_moderation.state_transition_validation'),
+      $container->get('datetime.time')
     );
   }
 

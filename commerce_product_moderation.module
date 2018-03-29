@@ -11,7 +11,7 @@ use Drupal\commerce_product_moderation\EntityOperations;
 use Drupal\commerce_product_moderation\EntityTypeInfo;
 use Drupal\commerce_product_moderation\Plugin\Action\ModerationOptOutPublishProduct;
 use Drupal\commerce_product_moderation\Plugin\Action\ModerationOptOutUnpublishProduct;
-use Drupal\commerce_product_variation\Plugin\Menu\EditTab;
+use Drupal\commerce_product_moderation\ProductPreprocess;
 use Drupal\Core\Access\AccessResult;
 use Drupal\Core\Entity\Display\EntityViewDisplayInterface;
 use Drupal\Core\Entity\EntityInterface;
@@ -42,20 +42,111 @@ function commerce_product_moderation_help($route_name, RouteMatchInterface $rout
 }
 
 /**
- * Implements hook_local_tasks_alter().
+ * Implements hook_entity_base_field_info().
  */
-function commerce_product_moderation_local_tasks_alter(&$local_tasks) {
-  $content_entity_type_ids = [
-    'commerce_product',
-    'commerce_product_variation',
-  ];
+function commerce_product_moderation_entity_base_field_info(EntityTypeInterface $entity_type) {
+  return \Drupal::service('class_resolver')
+    ->getInstanceFromDefinition(EntityTypeInfo::class)
+    ->entityBaseFieldInfo($entity_type);
+}
 
-  foreach ($content_entity_type_ids as $content_entity_type_id) {
-    if (isset($local_tasks["entity.$content_entity_type_id.edit_form"])) {
-      $local_tasks["entity.$content_entity_type_id.edit_form"]['class'] = EditTab::class;
-      $local_tasks["entity.$content_entity_type_id.edit_form"]['entity_type_id'] = $content_entity_type_id;
-    }
-  }
+/**
+ * Implements hook_entity_type_alter().
+ */
+function commerce_product_moderation_entity_type_alter(array &$entity_types) {
+  \Drupal::service('class_resolver')
+    ->getInstanceFromDefinition(EntityTypeInfo::class)
+    ->entityTypeAlter($entity_types);
+}
+
+/**
+ * Implements hook_entity_presave().
+ */
+function commerce_product_moderation_entity_presave(EntityInterface $entity) {
+  return \Drupal::service('class_resolver')
+    ->getInstanceFromDefinition(EntityOperations::class)
+    ->entityPresave($entity);
+}
+
+/**
+ * Implements hook_entity_insert().
+ */
+function commerce_product_moderation_entity_insert(EntityInterface $entity) {
+  return \Drupal::service('class_resolver')
+    ->getInstanceFromDefinition(EntityOperations::class)
+    ->entityInsert($entity);
+}
+
+/**
+ * Implements hook_entity_update().
+ */
+function commerce_product_moderation_entity_update(EntityInterface $entity) {
+  return \Drupal::service('class_resolver')
+    ->getInstanceFromDefinition(EntityOperations::class)
+    ->entityUpdate($entity);
+}
+
+/**
+ * Implements hook_entity_update().
+ */
+function commerce_product_moderation_entity_delete(EntityInterface $entity) {
+  return \Drupal::service('class_resolver')
+    ->getInstanceFromDefinition(EntityOperations::class)
+    ->entityDelete($entity);
+}
+
+/**
+ * Implements hook_entity_update().
+ */
+function commerce_product_moderation_entity_revision_delete(EntityInterface $entity) {
+  return \Drupal::service('class_resolver')
+    ->getInstanceFromDefinition(EntityOperations::class)
+    ->entityRevisionDelete($entity);
+}
+
+/**
+ * Implements hook_entity_update().
+ */
+function commerce_product_moderation_entity_translation_delete(EntityInterface $entity) {
+  return \Drupal::service('class_resolver')
+    ->getInstanceFromDefinition(EntityOperations::class)
+    ->entityTranslationDelete($entity);
+}
+
+/**
+ * Implements hook_form_alter().
+ */
+function commerce_product_moderation_form_alter(&$form, FormStateInterface $form_state, $form_id) {
+  \Drupal::service('class_resolver')
+    ->getInstanceFromDefinition(EntityTypeInfo::class)
+    ->formAlter($form, $form_state, $form_id);
+}
+
+/**
+ * Implements hook_preprocess_HOOK().
+ */
+function commerce_product_moderation_preprocess_commerce_product(&$variables) {
+  \Drupal::service('class_resolver')
+    ->getInstanceFromDefinition(ProductPreprocess::class)
+    ->preprocessProduct($variables);
+}
+
+/**
+ * Implements hook_entity_extra_field_info().
+ */
+function commerce_product_moderation_entity_extra_field_info() {
+  return \Drupal::service('class_resolver')
+    ->getInstanceFromDefinition(EntityTypeInfo::class)
+    ->entityExtraFieldInfo();
+}
+
+/**
+ * Implements hook_entity_view().
+ */
+function commerce_product_moderation_entity_view(array &$build, EntityInterface $entity, EntityViewDisplayInterface $display, $view_mode) {
+  \Drupal::service('class_resolver')
+    ->getInstanceFromDefinition(EntityOperations::class)
+    ->entityView($build, $entity, $display, $view_mode);
 }
 
 /**
@@ -64,9 +155,7 @@ function commerce_product_moderation_local_tasks_alter(&$local_tasks) {
 function commerce_product_moderation_entity_access(\Drupal\Core\Entity\EntityInterface $entity, $operation, \Drupal\Core\Session\AccountInterface $account) {
   /** @var \Drupal\content_moderation\ModerationInformationInterface $moderation_info */
   $moderation_info = Drupal::service('commerce_product_moderation.moderation_information');
-
   $entity_type = $entity->getEntityTypeId();
-
   $access_result = NULL;
 
   if ($entity_type === 'commerce_product') {
@@ -96,6 +185,27 @@ function commerce_product_moderation_entity_access(\Drupal\Core\Entity\EntityInt
   }
 
   return $access_result;
+}
+
+/**
+ * Implements hook_entity_field_access().
+ */
+function commerce_product_moderation_entity_field_access($operation, \Drupal\Core\Field\FieldDefinitionInterface $field_definition, \Drupal\Core\Session\AccountInterface $account, \Drupal\Core\Field\FieldItemListInterface $items = NULL)
+{
+  if ($items && $operation === 'edit') {
+    $moderationInfo = \Drupal::service('commerce_product_moderation.moderation_information');
+    $entityType = \Drupal::entityTypeManager()->getDefinition($field_definition->getTargetEntityTypeId());
+    $entity = $items->getEntity();
+
+    if ($entityType->hasKey('published')
+      && $moderationInfo->isModeratedEntity($entity)
+      && $entity->moderation_state
+      && $field_definition->getName() == $entityType->getKey('published')) {
+      return AccessResult::forbidden();
+    }
+  }
+
+  return AccessResult::neutral();
 }
 
 /**
@@ -134,82 +244,14 @@ function commerce_product_moderation_entity_bundle_info_alter(&$bundles) {
 }
 
 /**
- * Implements hook_entity_base_field_info().
+ * Implements hook_entity_bundle_delete().
  */
-function commerce_product_moderation_entity_base_field_info(EntityTypeInterface $entity_type) {
-  return \Drupal::service('class_resolver')
-    ->getInstanceFromDefinition(EntityTypeInfo::class)
-    ->entityBaseFieldInfo($entity_type);
-}
-
-/**
- * Implements hook_entity_type_alter().
- */
-function commerce_product_moderation_entity_type_alter(array &$entity_types) {
-  \Drupal::service('class_resolver')
-    ->getInstanceFromDefinition(EntityTypeInfo::class)
-    ->entityTypeAlter($entity_types);
-}
-
-/**
- * Implements hook_entity_operation().
- */
-function commerce_product_moderation_entity_operation(EntityInterface $entity) {
-  return \Drupal::service('class_resolver')
-    ->getInstanceFromDefinition(EntityTypeInfo::class)
-    ->entityOperation($entity);
-}
-
-/**
- * Implements hook_entity_presave().
- */
-function commerce_product_moderation_entity_presave(EntityInterface $entity) {
-  return \Drupal::service('class_resolver')
-    ->getInstanceFromDefinition(EntityOperations::class)
-    ->entityPresave($entity);
-}
-
-/**
- * Implements hook_entity_insert().
- */
-function commerce_product_moderation_entity_insert(EntityInterface $entity) {
-  return \Drupal::service('class_resolver')
-    ->getInstanceFromDefinition(EntityOperations::class)
-    ->entityInsert($entity);
-}
-
-/**
- * Implements hook_entity_update().
- */
-function commerce_product_moderation_entity_update(EntityInterface $entity) {
-  return \Drupal::service('class_resolver')
-    ->getInstanceFromDefinition(EntityOperations::class)
-    ->entityUpdate($entity);
-}
-
-/**
- * Implements hook_form_alter().
- */
-function commerce_product_moderation_form_alter(&$form, FormStateInterface $form_state, $form_id) {
-  \Drupal::service('class_resolver')
-    ->getInstanceFromDefinition(EntityTypeInfo::class)
-    ->formAlter($form, $form_state, $form_id);
-}
-
-/**
- * Implements hook_entity_extra_field_info().
- */
-function commerce_product_moderation_entity_extra_field_info() {
-  return \Drupal::service('class_resolver')
-    ->getInstanceFromDefinition(EntityTypeInfo::class)
-    ->entityExtraFieldInfo();
-}
-
-/**
- * Implements hook_entity_view().
- */
-function commerce_product_moderation_entity_view(array &$build, EntityInterface $entity, EntityViewDisplayInterface $display, $view_mode) {
-  \Drupal::service('class_resolver')
-    ->getInstanceFromDefinition(EntityOperations::class)
-    ->entityView($build, $entity, $display, $view_mode);
+function commerce_product_moderation_entity_bundle_delete($entity_type_id, $bundle)
+{
+  foreach (Workflow::loadMultipleByType('commerce_product_moderation') as $workflow) {
+    if ($workflow->getTypePlugin()->appliesToEntityTypeAndBundle($entity_type_id, $bundle)) {
+      $workflow->getTypePlugin()->removeEntityTypeAndBundle($entity_type_id, $bundle);
+      $workflow->save();
+    }
+  }
 }

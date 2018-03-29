@@ -3,10 +3,10 @@
 namespace Drupal\commerce_product_moderation;
 
 use Drupal\commerce_product_moderation\Form\ProductModerationForm;
+use Drupal\content_moderation\Entity\ContentModerationState;
+use Drupal\content_moderation\Entity\ContentModerationStateInterface;
 use Drupal\Core\Entity\Display\EntityViewDisplayInterface;
 use Drupal\Core\Entity\EntityInterface;
-use Drupal\Core\TypedData\TranslatableInterface;
-use Drupal\workflows\WorkflowInterface;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 
 /**
@@ -24,73 +24,6 @@ class EntityOperations Extends \Drupal\content_moderation\EntityOperations {
       $container->get('form_builder'),
       $container->get('entity_type.bundle.info')
     );
-  }
-
-  /**
-   * Set the latest revision.
-   *
-   * @param \Drupal\Core\Entity\EntityInterface $entity
-   *   The content entity to create content_moderation_state entity for.
-   */
-  protected function setLatestRevision(EntityInterface $entity) {
-    // No revisions.
-  }
-
-  /**
-   * Act on entities being assembled before rendering.
-   *
-   * This is a hook bridge.
-   *
-   * @see hook_entity_view()
-   * @see EntityFieldManagerInterface::getExtraFields()
-   */
-  public function entityView(array &$build, EntityInterface $entity, EntityViewDisplayInterface $display, $view_mode) {
-    if (!$this->moderationInfo->isModeratedEntity($entity)) {
-      return;
-    }
-    if (!$this->moderationInfo->isLatestRevision($entity)) {
-      return;
-    }
-
-    $component = $display->getComponent('content_moderation_control');
-    if ($component) {
-      $build['commerce_product_moderation_control'] = $this->formBuilder->getForm(ProductModerationForm::class, $entity);
-    }
-  }
-
-  /**
-   * Check if the default revision for the given entity is published.
-   *
-   * The default revision is the same as the entity retrieved by "default" from
-   * the storage handler. If the entity is translated, use the default revision
-   * of the same language as the given entity.
-   *
-   * @param \Drupal\Core\Entity\EntityInterface $entity
-   *   The entity being saved.
-   * @param \Drupal\workflows\WorkflowInterface $workflow
-   *   The workflow being applied to the entity.
-   *
-   * @return bool
-   *   TRUE if the default revision is published. FALSE otherwise.
-   *
-   * @throws \Drupal\Component\Plugin\Exception\InvalidPluginDefinitionException
-   */
-  protected function isDefaultRevisionPublished(EntityInterface $entity, WorkflowInterface $workflow) {
-    $storage = $this->entityTypeManager->getStorage($entity->getEntityTypeId());
-    $default_revision = $storage->load($entity->id());
-
-    // Ensure we are comparing the same translation as the current entity.
-    if ($default_revision instanceof TranslatableInterface && $default_revision->isTranslatable()) {
-      // If there is no translation, then there is no default revision and is
-      // therefore not published.
-      if (!$default_revision->hasTranslation($entity->language()->getId())) {
-        return FALSE;
-      }
-
-      $default_revision = $default_revision->getTranslation($entity->language()->getId());
-    }
-
-    return $default_revision && $workflow->getTypePlugin()->getState($entity->moderation_state->value)->isPublishedState();
   }
 
   /**
@@ -113,6 +46,74 @@ class EntityOperations Extends \Drupal\content_moderation\EntityOperations {
 
       // Fire per-entity-type logic for handling the save process.
       $this->entityTypeManager->getHandler($entity->getEntityTypeId(), 'product_moderation')->onPresave($entity, TRUE, $current_state->isPublishedState());
+    }
+  }
+
+  function updateOrCreateFromEntity(EntityInterface $entity)
+  {
+    $workflow = $this->moderationInfo->getWorkflowForEntity($entity);
+    $moderationState = ContentModerationState::loadFromModeratedEntity($entity);
+
+    if (!($moderationState instanceof ContentModerationStateInterface)) {
+      $storage = $this->entityTypeManager->getStorage('content_moderation_state');
+      $moderationState = $storage->create([
+        'content_entity_type_id' => $entity->getEntityTypeId(),
+        'content_entity_id' => $entity->id(),
+        'langcode' => $entity->language()->getId(),
+      ]);
+      $moderationState->workflow->target_id = $workflow->id();
+    }
+
+    if ($entity->getEntityType()->hasKey('langcode')) {
+      $entityLangcode = $entity->language()->getId();
+      if (!$moderationState->hasTranslation($entityLangcode)) {
+        $moderationState->addTranslation($entityLangcode);
+      }
+
+      if ($moderationState->language()->getId() !== $entityLangcode) {
+        $moderationState = $moderationState->getTranslation($entityLangcode);
+      }
+    }
+
+    $moderationStateVal = $entity->moderation_state->value;
+    if (!$moderationStateVal) {
+      $moderationStateVal = $workflow->getTypePlugin()->getInitialState($entity)->id();
+    }
+
+    $moderationState->set('moderation_state', $moderationStateVal);
+    ContentModerationState::updateOrCreateFromEntity($moderationState);
+  }
+
+  public function entityRevisionDelete(EntityInterface $entity)
+  {
+    // No revision support in Commerce yet.
+  }
+
+  /**
+   * Act on entities being assembled before rendering.
+   *
+   * This is a hook bridge.
+   *
+   * @see hook_entity_view()
+   * @see EntityFieldManagerInterface::getExtraFields()
+   */
+  public function entityView(array &$build, EntityInterface $entity, EntityViewDisplayInterface $display, $view_mode) {
+    if (!$this->moderationInfo->isModeratedEntity($entity)) {
+      return;
+    }
+    if (!$this->moderationInfo->isLatestRevision($entity)) {
+      return;
+    }
+    if ($this->moderationInfo->isLiveRevision($entity)) {
+      return;
+    }
+    if ($this->moderationInfo->isPendingRevisionAllowed($entity)) {
+      return;
+    }
+
+    $component = $display->getComponent('content_moderation_control');
+    if ($component) {
+      $build['commerce_product_moderation_control'] = $this->formBuilder->getForm(ProductModerationForm::class, $entity);
     }
   }
 

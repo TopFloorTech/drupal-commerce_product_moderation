@@ -2,6 +2,7 @@
 
 namespace Drupal\commerce_product_moderation\Plugin\Validation\Constraint;
 
+use Drupal\content_moderation\Plugin\Validation\Constraint\ModerationStateConstraint;
 use Symfony\Component\Validator\Constraint;
 
 /**
@@ -12,8 +13,5 @@ use Symfony\Component\Validator\Constraint;
  *   label = @Translation("Valid moderation state", context = "Validation")
  * )
  */
-class ProductModerationStateConstraint extends Constraint {
-
-  public $message = 'Invalid state transition from %from to %to';
-
+class ProductModerationStateConstraint extends ModerationStateConstraint {
 }

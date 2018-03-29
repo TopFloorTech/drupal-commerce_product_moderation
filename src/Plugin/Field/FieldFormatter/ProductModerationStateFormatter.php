@@ -2,12 +2,7 @@
 
 namespace Drupal\commerce_product_moderation\Plugin\Field\FieldFormatter;
 
-use Drupal\content_moderation\ModerationInformationInterface;
-use Drupal\Core\Entity\ContentEntityInterface;
-use Drupal\Core\Field\FieldDefinitionInterface;
-use Drupal\Core\Field\FormatterBase;
-use Drupal\Core\Field\FieldItemListInterface;
-use Drupal\Core\Plugin\ContainerFactoryPluginInterface;
+use Drupal\content_moderation\Plugin\Field\FieldFormatter\ContentModerationStateFormatter;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 
 /**
@@ -21,22 +16,7 @@ use Symfony\Component\DependencyInjection\ContainerInterface;
  *   }
  * )
  */
-class ProductModerationStateFormatter extends FormatterBase implements ContainerFactoryPluginInterface {
-
-  /**
-   * The moderation information service.
-   *
-   * @var \Drupal\content_moderation\ModerationInformationInterface
-   */
-  protected $moderationInformation;
-
-  /**
-   * Create an instance of ContentModerationStateFormatter.
-   */
-  public function __construct($plugin_id, $plugin_definition, FieldDefinitionInterface $field_definition, array $settings, $label, $view_mode, array $third_party_settings, ModerationInformationInterface $moderation_information) {
-    parent::__construct($plugin_id, $plugin_definition, $field_definition, $settings, $label, $view_mode, $third_party_settings);
-    $this->moderationInformation = $moderation_information;
-  }
+class ProductModerationStateFormatter extends ContentModerationStateFormatter {
 
   /**
    * {@inheritdoc}
@@ -52,29 +32,6 @@ class ProductModerationStateFormatter extends FormatterBase implements Container
       $configuration['third_party_settings'],
       $container->get('commerce_product_moderation.moderation_information')
     );
-  }
-
-  /**
-   * {@inheritdoc}
-   */
-  public function viewElements(FieldItemListInterface $items, $langcode) {
-    $elements = [];
-    /** @var ContentEntityInterface $entity */
-    $entity = $items->getEntity();
-    $workflow = $this->moderationInformation->getWorkflowForEntity($entity);
-    foreach ($items as $delta => $item) {
-      $elements[$delta] = [
-        '#markup' => $workflow->getTypePlugin()->getState($item->value)->label(),
-      ];
-    }
-    return $elements;
-  }
-
-  /**
-   * {@inheritdoc}
-   */
-  public static function isApplicable(FieldDefinitionInterface $field_definition) {
-    return $field_definition->getName() === 'moderation_state' && $field_definition->getTargetEntityTypeId() !== 'content_moderation_state';
   }
 
 }

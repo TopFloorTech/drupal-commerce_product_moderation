@@ -2,21 +2,7 @@
 
 namespace Drupal\commerce_product_moderation\Plugin\WorkflowType;
 
-use Drupal\commerce_product\Entity\ProductInterface;
-use Drupal\content_moderation\ModerationInformationInterface;
 use Drupal\content_moderation\Plugin\WorkflowType\ContentModeration;
-use Drupal\Core\Access\AccessResult;
-use Drupal\Core\Entity\EntityPublishedInterface;
-use Drupal\Core\Entity\EntityTypeBundleInfoInterface;
-use Drupal\Core\Entity\EntityTypeManagerInterface;
-use Drupal\Core\Form\FormStateInterface;
-use Drupal\Core\Plugin\ContainerFactoryPluginInterface;
-use Drupal\Core\Session\AccountInterface;
-use Drupal\Core\StringTranslation\StringTranslationTrait;
-use Drupal\content_moderation\ContentModerationState;
-use Drupal\workflows\Plugin\WorkflowTypeBase;
-use Drupal\workflows\StateInterface;
-use Drupal\workflows\WorkflowInterface;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 
 /**
@@ -29,9 +15,13 @@ use Symfony\Component\DependencyInjection\ContainerInterface;
  *     "draft",
  *     "published",
  *   },
+ *   forms = {
+ *     "configure" = "\Drupal\commerce_product_moderation\Form\ProductModerationConfigureForm",
+ *     "state" = "\Drupal\content_moderation\Form\ContentModerationStateForm"
+ *   },
  * )
  */
-class ProductModeration extends ContentModeration implements ContainerFactoryPluginInterface {
+class ProductModeration extends ContentModeration {
 
   /**
    * {@inheritdoc}

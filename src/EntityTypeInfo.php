@@ -5,14 +5,18 @@ namespace Drupal\commerce_product_moderation;
 use Drupal\commerce_product_moderation\Entity\Handler\ProductModerationHandler;
 use Drupal\commerce_product_moderation\Entity\Routing\ProductModerationRouteProvider;
 use Drupal\commerce_product_moderation\Plugin\Field\ModerationStateFieldItemList;
+use Drupal\content_moderation\ModerationInformationInterface;
+use Drupal\content_moderation\StateTransitionValidationInterface;
 use Drupal\Core\Entity\BundleEntityFormBase;
 use Drupal\Core\Entity\ContentEntityFormInterface;
 use Drupal\Core\Entity\ContentEntityTypeInterface;
-use Drupal\Core\Entity\EntityInterface;
+use Drupal\Core\Entity\EntityTypeBundleInfoInterface;
 use Drupal\Core\Entity\EntityTypeInterface;
+use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\Core\Field\BaseFieldDefinition;
 use Drupal\Core\Form\FormStateInterface;
-use Drupal\Core\Url;
+use Drupal\Core\Session\AccountInterface;
+use Drupal\Core\StringTranslation\TranslationInterface;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 
 /**
@@ -23,16 +27,14 @@ use Symfony\Component\DependencyInjection\ContainerInterface;
  */
 class EntityTypeInfo extends \Drupal\content_moderation\EntityTypeInfo {
 
-  /**
-   * A keyed array of custom moderation handlers for given entity types.
-   *
-   * Any entity not specified will use a common default.
-   *
-   * @var array
-   */
-  protected $moderationHandlers = [
-    'commerce_product' => ProductModerationHandler::class,
-  ];
+  public function __construct(TranslationInterface $translation, ModerationInformationInterface $moderation_information, EntityTypeManagerInterface $entity_type_manager, EntityTypeBundleInfoInterface $bundle_info, AccountInterface $current_user, StateTransitionValidationInterface $validator)
+  {
+    $this->moderationHandlers = [
+      'commerce_product' => ProductModerationHandler::class
+    ];
+
+    parent::__construct($translation, $moderation_information, $entity_type_manager, $bundle_info, $current_user, $validator);
+  }
 
   /**
    * {@inheritdoc}
@@ -54,7 +56,6 @@ class EntityTypeInfo extends \Drupal\content_moderation\EntityTypeInfo {
   public function entityTypeAlter(array &$entity_types) {
     if (isset($entity_types['commerce_product'])) {
       $entity_type = $entity_types['commerce_product'];
-      // The ContentModerationState entity type should never be moderated.
       $entity_types['commerce_product'] = $this->addModerationToEntityType($entity_type);
     }
   }
@@ -62,21 +63,23 @@ class EntityTypeInfo extends \Drupal\content_moderation\EntityTypeInfo {
   /**
    * {@inheritdoc}
    */
-  public function entityOperation(EntityInterface $entity) {
-    $operations = [];
-    $type = $entity->getEntityType();
-    $bundle_of = $type->getBundleOf();
-    if ($this->currentUser->hasPermission('administer commerce product moderation') && $bundle_of &&
-      $this->moderationInfo->canModerateEntitiesOfEntityType($this->entityTypeManager->getDefinition($bundle_of))
-    ) {
-      $operations['manage-moderation'] = [
-        'title' => t('Manage moderation'),
-        'weight' => 27,
-        'url' => Url::fromRoute("entity.{$type->id()}.moderation", [$entity->getEntityTypeId() => $entity->id()]),
-      ];
+  protected function addModerationToEntityType(ContentEntityTypeInterface $type) {
+    if (!$type->hasHandlerClass('product_moderation')) {
+      $handler_class = !empty($this->moderationHandlers[$type->id()]) ? $this->moderationHandlers[$type->id()] : ProductModerationHandler::class;
+      $type->setHandlerClass('product_moderation', $handler_class);
     }
 
-    return $operations;
+    if (!$type->hasLinkTemplate('latest-version') && $type->hasLinkTemplate('canonical')) {
+      $type->setLinkTemplate('latest-version', $type->getLinkTemplate('canonical'));
+    }
+
+    $providers = $type->getRouteProviderClasses() ?: [];
+    if (empty($providers['moderation'])) {
+      $providers['moderation'] = ProductModerationRouteProvider::class;
+      $type->setHandlerClass('route_provider', $providers);
+    }
+
+    return $type;
   }
 
   /**
@@ -94,6 +97,15 @@ class EntityTypeInfo extends \Drupal\content_moderation\EntityTypeInfo {
     }
 
     return $return;
+  }
+
+  public function getModeratedBundles() {
+    $type = $this->entityTypeManager->getDefinition('commerce_product');
+    foreach ($this->bundleInfo->getBundleInfo('commerce_product') as $bundleId => $bundle) {
+      if ($this->moderationInfo->shouldModerateEntitiesOfBundle($type, $bundleId)) {
+        yield ['entity' => 'commerce_product', 'bundle' => $bundleId];
+      }
+    }
   }
 
   /**
@@ -133,20 +145,6 @@ class EntityTypeInfo extends \Drupal\content_moderation\EntityTypeInfo {
   /**
    * {@inheritdoc}
    */
-  public static function bundleFormRedirect(array &$form, FormStateInterface $form_state) {
-    /* @var \Drupal\Core\Entity\ContentEntityInterface $entity */
-    $entity = $form_state->getFormObject()->getEntity();
-
-    $moderation_info = \Drupal::getContainer()->get('commerce_product_moderation.moderation_information');
-    if ($moderation_info->hasForwardRevision($entity) && $entity->hasLinkTemplate('latest-version')) {
-      $entity_type_id = $entity->getEntityTypeId();
-      $form_state->setRedirect("entity.$entity_type_id.latest_version", [$entity_type_id => $entity->id()]);
-    }
-  }
-
-  /**
-   * {@inheritdoc}
-   */
   public function formAlter(array &$form, FormStateInterface $form_state, $form_id) {
     $form_object = $form_state->getFormObject();
     if ($form_object instanceof BundleEntityFormBase) {
@@ -163,6 +161,14 @@ class EntityTypeInfo extends \Drupal\content_moderation\EntityTypeInfo {
           ->enforceRevisionsEntityFormAlter($form, $form_state, $form_id);
         // Submit handler to redirect to the latest version, if available.
         $form['actions']['submit']['#submit'][] = [EntityTypeInfo::class, 'bundleFormRedirect'];
+
+        if (isset($form['footer'])) {
+          $form['moderation_state']['#group'] = 'footer';
+        }
+
+        if (isset($form['meta']['published'])) {
+          $form['meta']['published']['#markup'] = $form['moderation_state']['widget'][0]['current']['#markup'];
+        }
       }
     }
   }
@@ -170,23 +176,15 @@ class EntityTypeInfo extends \Drupal\content_moderation\EntityTypeInfo {
   /**
    * {@inheritdoc}
    */
-  protected function addModerationToEntityType(ContentEntityTypeInterface $type) {
-    if (!$type->hasHandlerClass('product_moderation')) {
-      $handler_class = !empty($this->moderationHandlers[$type->id()]) ? $this->moderationHandlers[$type->id()] : ProductModerationHandler::class;
-      $type->setHandlerClass('product_moderation', $handler_class);
-    }
+  public static function bundleFormRedirect(array &$form, FormStateInterface $form_state) {
+    /* @var \Drupal\Core\Entity\ContentEntityInterface $entity */
+    $entity = $form_state->getFormObject()->getEntity();
 
-    if (!$type->hasLinkTemplate('latest-version') && $type->hasLinkTemplate('canonical')) {
-      $type->setLinkTemplate('latest-version', $type->getLinkTemplate('canonical'));
+    $moderation_info = \Drupal::getContainer()->get('commerce_product_moderation.moderation_information');
+    if ($moderation_info->hasPendingRevision($entity) && $entity->hasLinkTemplate('latest-version')) {
+      $entity_type_id = $entity->getEntityTypeId();
+      $form_state->setRedirect("entity.$entity_type_id.latest_version", [$entity_type_id => $entity->id()]);
     }
-
-    $providers = $type->getRouteProviderClasses() ?: [];
-    if (empty($providers['moderation'])) {
-      $providers['moderation'] = ProductModerationRouteProvider::class;
-      $type->setHandlerClass('route_provider', $providers);
-    }
-
-    return $type;
   }
 
 }
